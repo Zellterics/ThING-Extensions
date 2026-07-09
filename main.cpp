@@ -27,6 +27,16 @@ void update(ThING::API& api, FPSCounter& fps){
 
 void ui(ThING::API& api, FPSCounter& fps){
     scrollZoom(api);
+    ImGuiIO& io = ImGui::GetIO();
+    if(!io.WantCaptureMouse){
+        if(ImGui::IsMouseDown(ImGuiMouseButton_Left)){
+            ImVec2 delta = ImGui::GetIO().MouseDelta;
+            glm::vec2 offset = api.getOffset();
+            offset.x -= delta.x / api.getZoom();
+            offset.y -= delta.y / api.getZoom();
+            api.setOffset(offset);
+        }
+    }
     static ThING::ext::BackGroundInfo bg;
     beginWindow(api, "Background");
     ImGui::ColorPicker4("Color", &bg.gridColor.x);
@@ -36,22 +46,17 @@ void ui(ThING::API& api, FPSCounter& fps){
     ImGui::SliderInt("Grid Size", &saveGridSize, 0, 16);
     bg.gridSize = saveGridSize;
     ImGui::End();
+    static ThING::ext::WindowBorder wb;
+    beginWindow(api, "border");
+    ImGui::ColorPicker4("Color", &wb.color.x);
+    ImGui::SliderFloat("thickness", &wb.width, 0, 40);
+    ImGui::End();
 
     // Background Use Example
     ThING::ext::buildHexBackground(api, bg);
-
+    ThING::ext::buildWindowBorder(api, wb);
     
-    ImGuiIO& io = ImGui::GetIO();
-    if(io.WantCaptureMouse){
-        return;
-    }
-    if(ImGui::IsMouseDown(ImGuiMouseButton_Left)){
-        ImVec2 delta = ImGui::GetIO().MouseDelta;
-        glm::vec2 offset = api.getOffset();
-        offset.x -= delta.x / api.getZoom();
-        offset.y -= delta.y / api.getZoom();
-        api.setOffset(offset);
-    }
+    
 }
 
 int main(){

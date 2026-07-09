@@ -1,10 +1,13 @@
 #pragma once
 #include "ThING/api.h"
 #include "ThING/types/apiTypes.h"
+#include "ThING/types/vertex.h"
 #include "glm/ext/scalar_constants.hpp"
 #include "glm/ext/vector_float2.hpp"
 #include "glm/ext/vector_float4.hpp"
+#include <array>
 #include <cstdint>
+#include <utility>
 #include <vector>
 
 namespace ThING::ext {
@@ -172,6 +175,72 @@ static inline void buildHexBackground(ThING::API& api, const BackGroundInfo& inf
     }
     
     return;
+}
+
+struct WindowBorder{
+    glm::vec4 color = {1,1,1,1};
+    float width = 10.f;
+
+    bool operator==(const WindowBorder& other){
+        if(this->color == other.color && this->width == other.width){
+            return true;
+        }
+        return false;
+    }
+    bool operator!=(const WindowBorder& other){
+        if(*this == other){
+            return false;
+        }
+        return true;
+    }
+};
+
+static inline void buildWindowBorder(ThING::API& api, const WindowBorder info){
+    static WindowBorder windowBorder = info;
+    static float zoom = api.getZoom();
+    static glm::vec2 offset = api.getOffset();
+    static bool first = true;
+    if(!first && windowBorder == info && zoom == api.getZoom() && offset == api.getOffset()){
+        return;
+    }
+    std::pair<int, int> windowSize;
+    api.getWindowSize(&windowSize.first, &windowSize.second);
+    static std::array<Entity, 4> borders;
+    const float width = (float)windowSize.first / 2;
+    const float height = (float)windowSize.second / 2;
+    const float thickness = info.width * 2;
+
+    if(first){
+        static std::array<Vertex, 4> QUAD_VERTICES = {{
+            {{-1.f, -1.f}, {-1.0f, -1.0f}},
+            {{1.f, -1.f}, {1.0f, -1.0f}},
+            {{1.f, 1.f}, {1.0f, 1.0f}},
+            {{-1.f, 1.f}, {-1.0f, 1.0f}}
+        }};
+
+        static std::array<uint16_t, 6> QUAD_INDICES = {0,1,2,2,3,0};
+        
+        borders[0] = api.addPolygon({width, 0}, info.color, {thickness, height}, QUAD_VERTICES, QUAD_INDICES);
+        borders[1] = api.addPolygon({-width, 0}, info.color, {thickness, height}, QUAD_VERTICES, QUAD_INDICES);
+        borders[2] = api.addPolygon({0, height}, info.color, {width, thickness}, QUAD_VERTICES, QUAD_INDICES);
+        borders[3] = api.addPolygon({0, -height}, info.color, {width, thickness}, QUAD_VERTICES, QUAD_INDICES);
+        first = false;
+        return;
+    }
+    zoom = api.getZoom();
+    offset = api.getOffset();
+    api.getInstance(borders[0]).color = info.color;
+    api.getInstance(borders[0]).position = {(width / zoom) + offset.x, offset.y};
+    api.getInstance(borders[0]).scale = {thickness / zoom, height / zoom};
+    api.getInstance(borders[1]).color = info.color;
+    api.getInstance(borders[1]).position = {(-width / zoom) + offset.x, offset.y};
+    api.getInstance(borders[1]).scale = {thickness / zoom, height / zoom};
+    api.getInstance(borders[2]).color = info.color;
+    api.getInstance(borders[2]).position = {offset.x, (height / zoom) + offset.y};
+    api.getInstance(borders[2]).scale = {width / zoom, thickness / zoom};
+    api.getInstance(borders[3]).color = info.color;
+    api.getInstance(borders[3]).position = {offset.x, (-height / zoom) + offset.y};
+    api.getInstance(borders[3]).scale = {width / zoom, thickness / zoom};
 }
 
 }
