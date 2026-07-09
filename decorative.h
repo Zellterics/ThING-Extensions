@@ -120,7 +120,7 @@ static inline void buildHexBackground(ThING::API& api, const BackGroundInfo& inf
                 const glm::vec2 scale = vSize / cameraZoom;
                 Entity e = api.addRegularPol(6, pos + api.getOffset(), scale, gridColor);
                 api.getInstance(e).rotation = glm::pi<float>() / 6.f;
-                api.getInstance(e).drawIndex = -20;
+                api.getInstance(e).drawIndex = -102;
                 
                 tiles[(i + gridSize) * 2][j + gridSize] = e;
             }
@@ -132,7 +132,7 @@ static inline void buildHexBackground(ThING::API& api, const BackGroundInfo& inf
                 const glm::vec2 scale = vSize / cameraZoom;
                 Entity e = api.addRegularPol(6, pos + api.getOffset(), scale, gridColor);
                 api.getInstance(e).rotation = glm::pi<float>() / 6.f;
-                api.getInstance(e).drawIndex = -20;
+                api.getInstance(e).drawIndex = -102;
                 tiles[((i + gridSize) * 2) + 1][j + gridSize] = e;
             }
         }
@@ -177,9 +177,75 @@ static inline void buildHexBackground(ThING::API& api, const BackGroundInfo& inf
     return;
 }
 
+struct AspectRatio{
+    int width = -1;
+    int height = -1;
+};
+
+static inline void keepAspectRatio(ThING::API& api, const AspectRatio info){
+    if(info.height == -1 || info.width == -1){
+        return;
+    }
+    int width, height;
+    AspectRatio aspectRatio = info;
+    static bool first = true;
+    api.getWindowSize(&width, &height);
+    static std::array<Entity, 4> borders;
+    float ratio = (float)aspectRatio.width / aspectRatio.height;
+    float customHeight = height;
+    float customWidth = width;
+    float wthickness = 0;
+    float hthickness = 0;
+    if(((float)width / height) < ratio){
+        customHeight = (width / ratio) / 2;
+        hthickness = (height - customHeight) * 2;
+    } else {
+        customWidth = (height * ratio) / 2;
+        wthickness = (width - customWidth) * 2;
+    }
+
+    if(first){
+        static std::array<Vertex, 4> QUAD_VERTICES = {{
+            {{-1.f, -1.f}, {-1.0f, -1.0f}},
+            {{1.f, -1.f}, {1.0f, -1.0f}},
+            {{1.f, 1.f}, {1.0f, 1.0f}},
+            {{-1.f, 1.f}, {-1.0f, 1.0f}}
+        }};
+
+        static std::array<uint16_t, 6> QUAD_INDICES = {0,1,2,2,3,0};
+        
+        const glm::vec4 color = {0,0,0,1};
+
+        borders[0] = api.addPolygon({customWidth + wthickness, 0}, color, {wthickness, height / 2}, QUAD_VERTICES, QUAD_INDICES);
+        borders[1] = api.addPolygon({-customWidth - wthickness, 0}, color, {wthickness, height / 2}, QUAD_VERTICES, QUAD_INDICES);
+        borders[2] = api.addPolygon({0, customHeight + hthickness}, color, {width / 2, hthickness}, QUAD_VERTICES, QUAD_INDICES);
+        borders[3] = api.addPolygon({0, -customHeight - hthickness}, color, {width / 2, hthickness}, QUAD_VERTICES, QUAD_INDICES);
+        
+        api.getInstance(borders[0]).drawIndex = 201;
+        api.getInstance(borders[1]).drawIndex = 201;
+        api.getInstance(borders[2]).drawIndex = 201;
+        api.getInstance(borders[3]).drawIndex = 201;
+        first = false;
+        return;
+    }
+
+    glm::vec2 offset = api.getOffset();
+    float zoom = api.getZoom();
+
+    api.getInstance(borders[0]).position = {((customWidth + wthickness) / zoom) + offset.x, offset.y};
+    api.getInstance(borders[0]).scale = {wthickness / zoom, height / (2 * zoom)};
+    api.getInstance(borders[1]).position = {((-customWidth - wthickness) / zoom) + offset.x, offset.y};
+    api.getInstance(borders[1]).scale = {wthickness / zoom, height / (2 * zoom)};
+    api.getInstance(borders[2]).position = {offset.x, ((customHeight + hthickness) / zoom) + offset.y};
+    api.getInstance(borders[2]).scale = {width / (2 * zoom), hthickness / zoom};
+    api.getInstance(borders[3]).position = {offset.x, ((-customHeight - hthickness) / zoom) + offset.y};
+    api.getInstance(borders[3]).scale = {width / (2 * zoom), hthickness / zoom};
+}
+
 struct WindowBorder{
     glm::vec4 color = {1,1,1,1};
     float width = 10.f;
+    AspectRatio aspectRatio;
 
     bool operator==(const WindowBorder& other){
         if(this->color == other.color && this->width == other.width){
@@ -197,18 +263,28 @@ struct WindowBorder{
 
 static inline void buildWindowBorder(ThING::API& api, const WindowBorder info){
     static WindowBorder windowBorder = info;
-    static float zoom = api.getZoom();
-    static glm::vec2 offset = api.getOffset();
     static bool first = true;
-    if(!first && windowBorder == info && zoom == api.getZoom() && offset == api.getOffset()){
-        return;
-    }
-    std::pair<int, int> windowSize;
+
+    static std::pair<int, int> windowSize;
     api.getWindowSize(&windowSize.first, &windowSize.second);
     static std::array<Entity, 4> borders;
-    const float width = (float)windowSize.first / 2;
-    const float height = (float)windowSize.second / 2;
-    const float thickness = info.width * 2;
+    float width = (float)windowSize.first / 2;
+    float height = (float)windowSize.second / 2;
+    float thickness = info.width * 2;
+
+    if(!(info.aspectRatio.width == -1 || info.aspectRatio.height == -1)){
+        float ratio = (float)info.aspectRatio.width / info.aspectRatio.height;
+        float inverseRatio = (float)info.aspectRatio.height / info.aspectRatio.width;
+        float customHeight = height;
+        float customWidth = width;
+        if(((float)width / height) < ratio){
+            customHeight = (width / ratio);
+        } else {
+            customWidth = (height * ratio);
+        }
+        height = customHeight;
+        width = customWidth;
+    }
 
     if(first){
         static std::array<Vertex, 4> QUAD_VERTICES = {{
@@ -224,11 +300,15 @@ static inline void buildWindowBorder(ThING::API& api, const WindowBorder info){
         borders[1] = api.addPolygon({-width, 0}, info.color, {thickness, height}, QUAD_VERTICES, QUAD_INDICES);
         borders[2] = api.addPolygon({0, height}, info.color, {width, thickness}, QUAD_VERTICES, QUAD_INDICES);
         borders[3] = api.addPolygon({0, -height}, info.color, {width, thickness}, QUAD_VERTICES, QUAD_INDICES);
+        api.getInstance(borders[0]).drawIndex = 200;
+        api.getInstance(borders[1]).drawIndex = 200;
+        api.getInstance(borders[2]).drawIndex = 200;
+        api.getInstance(borders[3]).drawIndex = 200;
         first = false;
         return;
     }
-    zoom = api.getZoom();
-    offset = api.getOffset();
+    float zoom = api.getZoom();
+    glm::vec2 offset = api.getOffset();
     api.getInstance(borders[0]).color = info.color;
     api.getInstance(borders[0]).position = {(width / zoom) + offset.x, offset.y};
     api.getInstance(borders[0]).scale = {thickness / zoom, height / zoom};
@@ -242,5 +322,7 @@ static inline void buildWindowBorder(ThING::API& api, const WindowBorder info){
     api.getInstance(borders[3]).position = {offset.x, (-height / zoom) + offset.y};
     api.getInstance(borders[3]).scale = {width / zoom, thickness / zoom};
 }
+
+
 
 }

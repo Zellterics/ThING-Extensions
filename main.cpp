@@ -15,7 +15,8 @@ void update(ThING::API& api, FPSCounter& fps){
         
         e = api.addCircle({0,0}, 10, {1.f,1.f,1.f,1.f});
         api.addLine({0,0}, {100,100}, 10.f);
-        api.addRegularPol(8, {100, -100}, {30, 30}, {1,1,1,1});
+        Entity pol;
+        pol = api.addRegularPol(8, {100, -100}, {30, 30}, {1,1,1,1});
         first = false;
     }
     
@@ -46,17 +47,22 @@ void ui(ThING::API& api, FPSCounter& fps){
     ImGui::SliderInt("Grid Size", &saveGridSize, 0, 16);
     bg.gridSize = saveGridSize;
     ImGui::End();
+
+
     static ThING::ext::WindowBorder wb;
+    wb.aspectRatio = {1,1};
     beginWindow(api, "border");
     ImGui::ColorPicker4("Color", &wb.color.x);
     ImGui::SliderFloat("thickness", &wb.width, 0, 40);
     ImGui::End();
 
-    // Background Use Example
+
+    static ThING::ext::AspectRatio ar = {1,1};
+
+    // Use Examples
     ThING::ext::buildHexBackground(api, bg);
     ThING::ext::buildWindowBorder(api, wb);
-    
-    
+    ThING::ext::keepAspectRatio(api, ar);
 }
 
 int main(){
