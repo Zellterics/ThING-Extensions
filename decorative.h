@@ -177,15 +177,72 @@ static inline void buildHexBackground(ThING::API& api, const BackGroundInfo& inf
     return;
 }
 
-struct AspectRatio{
-    int width = -1;
-    int height = -1;
+
+struct WorldBorder{
+    float up;
+    float down;
+    float left;
+    float right;
 };
 
-static inline void keepAspectRatio(ThING::API& api, const AspectRatio info){
-    if(info.height == -1 || info.width == -1){
-        return;
+struct AspectRatio{
+    int width = 0;
+    int height = 0;
+};
+
+struct WindowBorderInfo{
+    glm::vec4 color = {1,1,1,1};
+    float width = 0.f;
+    AspectRatio aspectRatio;
+
+    bool operator==(const WindowBorderInfo& other){
+        if(this->color == other.color && this->width == other.width){
+            return true;
+        }
+        return false;
     }
+    bool operator!=(const WindowBorderInfo& other){
+        if(*this == other){
+            return false;
+        }
+        return true;
+    }
+};
+
+
+static inline WorldBorder getWorldBorder(ThING::API& api, const WindowBorderInfo info = {}){
+    WorldBorder wb;
+    int width, height;
+    float zoom = api.getZoom();
+    glm::vec2 offset = api.getOffset();
+    api.getWindowSize(&width, &height);
+    width /= 2;
+    height /= 2;
+    if(info.aspectRatio.height <= 0 || info.aspectRatio.width <= 0){
+        wb.up = ((height - (info.width * 2)) / zoom) + offset.y;
+        wb.down = ((-height + (info.width * 2)) / zoom) + offset.y;
+        wb.right = ((width - (info.width * 2)) / zoom) + offset.x;
+        wb.left = ((-width + (info.width * 2)) / zoom) + offset.x;
+        return wb;
+    }
+    float ratio = (float)info.aspectRatio.width / info.aspectRatio.height;
+    float customHeight = height;
+    float customWidth = width;
+    if(((float)width / height) < ratio){
+        customHeight = (width / ratio);
+    } else {
+        customWidth = (height * ratio);
+    }
+
+    wb.up = ((customHeight - (info.width * 2)) / zoom) + offset.y;
+    wb.down = ((-customHeight + (info.width * 2)) / zoom) + offset.y;
+    wb.right = ((customWidth - (info.width * 2)) / zoom) + offset.x;
+    wb.left = ((-customWidth + (info.width * 2)) / zoom) + offset.x;
+    return wb;
+}
+
+static inline void keepAspectRatio(ThING::API& api, const AspectRatio info){
+    
     int width, height;
     AspectRatio aspectRatio = info;
     static bool first = true;
@@ -196,14 +253,16 @@ static inline void keepAspectRatio(ThING::API& api, const AspectRatio info){
     float customWidth = width;
     float wthickness = 0;
     float hthickness = 0;
-    if(((float)width / height) < ratio){
-        customHeight = (width / ratio) / 2;
-        hthickness = (height - customHeight) * 2;
-    } else {
-        customWidth = (height * ratio) / 2;
-        wthickness = (width - customWidth) * 2;
+    if(info.height > 0 && info.width > 0){
+        if(((float)width / height) < ratio){
+            customHeight = (width / ratio) / 2;
+            hthickness = (height - customHeight) * 2;
+        } else {
+            customWidth = (height * ratio) / 2;
+            wthickness = (width - customWidth) * 2;
+        }
     }
-
+    
     if(first){
         static std::array<Vertex, 4> QUAD_VERTICES = {{
             {{-1.f, -1.f}, {-1.0f, -1.0f}},
@@ -212,7 +271,7 @@ static inline void keepAspectRatio(ThING::API& api, const AspectRatio info){
             {{-1.f, 1.f}, {-1.0f, 1.0f}}
         }};
 
-        static std::array<uint16_t, 6> QUAD_INDICES = {0,1,2,2,3,0};
+        static std::array<uint32_t, 6> QUAD_INDICES = {0,1,2,2,3,0};
         
         const glm::vec4 color = {0,0,0,1};
 
@@ -242,27 +301,8 @@ static inline void keepAspectRatio(ThING::API& api, const AspectRatio info){
     api.getInstance(borders[3]).scale = {width / (2 * zoom), hthickness / zoom};
 }
 
-struct WindowBorder{
-    glm::vec4 color = {1,1,1,1};
-    float width = 10.f;
-    AspectRatio aspectRatio;
-
-    bool operator==(const WindowBorder& other){
-        if(this->color == other.color && this->width == other.width){
-            return true;
-        }
-        return false;
-    }
-    bool operator!=(const WindowBorder& other){
-        if(*this == other){
-            return false;
-        }
-        return true;
-    }
-};
-
-static inline void buildWindowBorder(ThING::API& api, const WindowBorder info){
-    static WindowBorder windowBorder = info;
+static inline void buildWindowBorder(ThING::API& api, const WindowBorderInfo info){
+    static WindowBorderInfo windowBorder = info;
     static bool first = true;
 
     static std::pair<int, int> windowSize;
@@ -272,7 +312,7 @@ static inline void buildWindowBorder(ThING::API& api, const WindowBorder info){
     float height = (float)windowSize.second / 2;
     float thickness = info.width * 2;
 
-    if(!(info.aspectRatio.width == -1 || info.aspectRatio.height == -1)){
+    if((info.aspectRatio.height > 0 && info.aspectRatio.width > 0)){
         float ratio = (float)info.aspectRatio.width / info.aspectRatio.height;
         float inverseRatio = (float)info.aspectRatio.height / info.aspectRatio.width;
         float customHeight = height;
@@ -294,7 +334,7 @@ static inline void buildWindowBorder(ThING::API& api, const WindowBorder info){
             {{-1.f, 1.f}, {-1.0f, 1.0f}}
         }};
 
-        static std::array<uint16_t, 6> QUAD_INDICES = {0,1,2,2,3,0};
+        static std::array<uint32_t, 6> QUAD_INDICES = {0,1,2,2,3,0};
         
         borders[0] = api.addPolygon({width, 0}, info.color, {thickness, height}, QUAD_VERTICES, QUAD_INDICES);
         borders[1] = api.addPolygon({-width, 0}, info.color, {thickness, height}, QUAD_VERTICES, QUAD_INDICES);
